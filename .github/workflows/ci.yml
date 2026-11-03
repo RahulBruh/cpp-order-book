@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [g++, clang++]
+        sanitize: [OFF, ON]
+    name: ${{ matrix.compiler }} sanitize=${{ matrix.sanitize }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GoogleTest
+        run: sudo apt-get update && sudo apt-get install -y libgtest-dev ninja-build
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_CXX_COMPILER=${{ matrix.compiler }}
+          -DCMAKE_BUILD_TYPE=${{ matrix.sanitize == 'ON' && 'RelWithDebInfo' || 'Release' }}
+          -DLOB_SANITIZE=${{ matrix.sanitize }}
+          -DLOB_WERROR=ON
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Benchmark (smoke)
+        if: matrix.sanitize == 'OFF'
+        run: ./build/lob_bench --messages 1000000 --reps 3
