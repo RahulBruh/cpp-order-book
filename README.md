@@ -2,6 +2,8 @@
 
 A single-instrument limit order book with **price-time priority** matching, written in C++20. It has two interchangeable price-level stores: a `std::map` baseline and a tick-indexed array with an occupancy bitset. A randomized differential test checks both against a deliberately naive reference book, and a benchmark replays a seeded order-flow stream through each.
 
+**Live demo:** [rahulmoka.com/projects/cpp-order-book](https://www.rahulmoka.com/projects/cpp-order-book). Trade against the engine in your browser (it's compiled to WebAssembly) and benchmark the two books on the same seeded stream.
+
 ## Features
 
 - **Order types:** limit (good-till-cancel), market and IOC. Supports partial fills, cancel, and modify.
@@ -74,6 +76,22 @@ cmake --build build-asan -j && ctest --test-dir build-asan
 
 CI (GitHub Actions) builds with GCC and Clang with warnings as errors, runs the tests, runs them again under ASan/UBSan, and runs a short benchmark.
 
+## Browser demo (WebAssembly)
+
+`web/` builds the same headers, unchanged, into a 63 KB WebAssembly module with clang and wasm-ld (no Emscripten). `wasm_api.cpp` is a small C API over the book: it records each call's events for the page, and it carries a copy of the benchmark's order-flow generator so the page can replay the same seeded stream into both books.
+
+```bash
+./web/build.sh                                 # needs clang, lld and a WASI sysroot with libc++ (see the script)
+node web/test_wasm.mjs                         # behaviour checks against the wasm build
+cd web && python3 -m http.server               # then open http://localhost:8000
+```
+
+The page has a depth ladder that shows each level's queue in time order, order entry (limit, IOC, market), modify and cancel on any resting order, simulated order flow, and a benchmark that runs in a Web Worker.
+
+CI checks the wasm build against a native build: the benchmark stream is generated with the standard library's random distributions, which differ between libc++ and libstdc++, so CI compiles `lob_bench` with libc++ and requires the wasm replay to report the same trade count and traded volume. For seed 42 and 1M messages both give 140,367 trades and 3,555,528 shares.
+
+The browser benchmark is slower than native, and the two books end up closer together there: about 1.04× in headless Chrome, against 1.22–1.33× natively.
+
 ## Layout
 
 ```
@@ -81,6 +99,7 @@ include/lob/   order_book.hpp (matching), array_levels.hpp, map_levels.hpp,
                price_level.hpp (intrusive FIFO), flat_id_map.hpp, object_pool.hpp, types.hpp
 tests/         unit, differential, hash-map and no-allocation tests; reference_book.hpp
 bench/         bench.cpp
+web/           wasm_api.cpp (C API for the browser), build.sh, the demo page, test_wasm.mjs
 ```
 
 ## Not in scope
