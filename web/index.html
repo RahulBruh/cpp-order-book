@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C++ Limit Order Book: price-time matching in WebAssembly</title>
+  <meta name="description" content="Trade against a C++20 limit order book compiled to WebAssembly: limit, market and IOC orders, cancels and modifies, plus an in-browser benchmark of std::map vs tick-array price levels.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div>
+        <h1>C++ Limit Order Book</h1>
+        <p class="sub">Price-time priority matching · C++20 compiled to WebAssembly</p>
+      </div>
+      <span class="pill" id="engine" data-state="loading">Loading engine…</span>
+    </header>
+
+    <main class="layout">
+      <section class="ladder-card">
+        <div class="card-head">
+          <h2>Order book</h2>
+          <span class="muted small" id="touch">—</span>
+        </div>
+        <div class="ladder-cols"><span>Price</span><span>Size</span><span>Queue, oldest first · click to select</span></div>
+        <div class="ladder" id="asks"></div>
+        <div class="spread" id="spread">Empty book</div>
+        <div class="ladder" id="bids"></div>
+        <dl class="stats" id="stats"></dl>
+      </section>
+
+      <aside class="panel">
+        <div class="card">
+          <div class="card-head"><h2>New order</h2><span class="muted small">1 tick = $0.01</span></div>
+          <form id="order" class="order-form" autocomplete="off">
+            <div class="seg" role="radiogroup" aria-label="Side">
+              <button type="button" class="seg-btn buy on" data-side="buy">Buy</button>
+              <button type="button" class="seg-btn sell" data-side="sell">Sell</button>
+            </div>
+            <div class="seg" role="radiogroup" aria-label="Order type">
+              <button type="button" class="seg-btn on" data-type="limit" title="Rests whatever doesn't fill">Limit</button>
+              <button type="button" class="seg-btn" data-type="ioc" title="Fills up to the limit price, cancels the rest">IOC</button>
+              <button type="button" class="seg-btn" data-type="market" title="Fills at any price, cancels the rest">Market</button>
+            </div>
+            <div class="fields">
+              <label>Price <input id="price" type="number" step="0.01" min="90" max="110" value="100.00"></label>
+              <label>Qty <input id="qty" type="number" step="1" min="1" value="100"></label>
+            </div>
+            <button class="btn primary wide" id="submit" type="submit" disabled>Buy 100 @ 100.00</button>
+          </form>
+        </div>
+
+        <div class="card" id="selected-card">
+          <div class="card-head"><h2>Selected order</h2><span class="muted small" id="sel-label">none</span></div>
+          <div class="fields">
+            <label>Price <input id="m-price" type="number" step="0.01" min="90" max="110" disabled></label>
+            <label>Qty <input id="m-qty" type="number" step="1" min="1" disabled></label>
+          </div>
+          <div class="row">
+            <button class="btn" id="modify" disabled>Modify</button>
+            <button class="btn danger" id="cancel" disabled>Cancel</button>
+          </div>
+          <p class="muted small note">Same price with less qty keeps its place in the queue. A new price or more qty sends it to the back.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Simulated flow</h2><span class="muted small" id="flow-rate"></span></div>
+          <div class="row">
+            <button class="btn" id="flow">▶ Run flow</button>
+            <button class="btn" id="seed">Seed book</button>
+            <button class="btn" id="clear">Clear</button>
+          </div>
+          <label class="speed">Speed <input type="range" id="speed" min="1" max="60" value="8"></label>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Event stream</h2><span class="muted small">from the engine's listener</span></div>
+          <ol class="tape" id="tape"><li class="muted">Send an order or run the flow to see events.</li></ol>
+        </div>
+      </aside>
+    </main>
+
+    <section class="card bench">
+      <div class="card-head">
+        <h2>Benchmark in your browser</h2>
+        <span class="muted small">same seeded order flow as the repo's lob_bench</span>
+      </div>
+      <p class="muted">
+        Generates a seeded stream (53% add, 39% cancel, 8% modify, about 7% marketable) and replays it
+        into a fresh <code>std::map</code> book and a fresh tick-array + bitset book, 3 times each, in a
+        Web Worker. Both books must report the same trades.
+      </p>
+      <div class="row">
+        <select id="bench-n" aria-label="Messages">
+          <option value="250000">250k messages</option>
+          <option value="1000000" selected>1M messages</option>
+          <option value="2000000">2M messages</option>
+        </select>
+        <button class="btn primary" id="bench-run" disabled>Run benchmark</button>
+        <span class="muted small" id="bench-status"></span>
+      </div>
+      <div class="bars" id="bars"></div>
+      <p class="muted small" id="bench-note">
+        Native results (GCC -O3, AMD Ryzen 5 7600): 58–63M msgs/s for the tick array vs 45–50M for
+        std::map. WebAssembly in a browser tab runs slower than native, and the gap between the two books is smaller.
+      </p>
+    </section>
+
+    <footer class="foot muted small">
+      <a href="https://github.com/RahulBruh/cpp-order-book">Source on GitHub</a> ·
+      engine headers compiled unchanged with clang to a 62 KB wasm module
+    </footer>
+  </div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
